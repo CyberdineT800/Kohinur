@@ -55,6 +55,15 @@ class Groups(Database):
         sql = "SELECT * FROM Groups"
         return await self.execute(sql, fetch=True)
 
+    async def select_all_groups_with_teachers(self):
+        sql = """
+                SELECT g.*, t.Teacher_FullName AS group_teacher_fullname
+                    FROM Groups g
+                        JOIN Teachers t ON g.group_teacher_Id = t.teacher_Id
+                    ORDER BY g.group_id ASC
+              """
+        return await self.execute(sql, fetch=True)
+
     async def select_group(self, **kwargs):
         kwargs = {key: value for key, value in kwargs.items()}
         sql = "SELECT * FROM Groups WHERE 1=1 AND "

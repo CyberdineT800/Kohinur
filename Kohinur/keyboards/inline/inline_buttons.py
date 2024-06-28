@@ -1,6 +1,7 @@
+from datetime import datetime, date, timedelta
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from data.text_values import CANCEL, NEXT_PAGE, NO_TEXT, PREV_PAGE, SOMETHING, SPLITTER, STUDENT_ATTENDANCE_EXIST_STATUS, STUDENT_GROUPS, TEACHER_GROUPS, TEACHER_SUBJECTS, TEACHER_TESTS, CONFIRM, UPDATE, YES_TEXT
+from data.text_values import CANCEL, NEXT_PAGE, NO_TEXT, PREV_PAGE, SOMETHING, SPLITTER, STUDENT_ATTENDANCE_EXIST_STATUS, STUDENT_GROUPS, TEACHER_GROUPS, TEACHER_SUBJECTS, TEACHER_TESTS, CONFIRM, PAID, UNPAID, YES_TEXT
 
 
 def subject_btns(subjects):
@@ -149,9 +150,18 @@ def create_attendance_group_payments_btns(group_payments):
                        text=str(group_payments[student_id]['payment_last_date']),
                        callback_data="payment"))
 
-        row.append(InlineKeyboardButton(
-                       text=UPDATE,
-                       callback_data=f"student_payment_update_{student_id}"))
+        last_payment = group_payments[student_id]['payment_last_date']
+        today = date.today()
+        
+        if last_payment.month == today.month:
+            row.append(InlineKeyboardButton(
+                           text=UNPAID,
+                           callback_data=f"student_payment_update_{student_id}"))
+        else:
+            row.append(InlineKeyboardButton(
+                           text=PAID,
+                           callback_data=f"student_payment_update_{student_id}"))
+            
 
         inline_keyboard.append(row)
 

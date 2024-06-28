@@ -151,3 +151,27 @@ async def create_all_groups_info(groups, student_counts, page=0, items_per_page=
         res += '\n\n\n'
         
     return res
+
+
+async def create_payment_info(datas):
+    res = "<blockquote>To'lov haqida ma'lumot</blockquote>\n\n"
+    res += f"  O'quvchi: {datas['student_fullname']}\n"
+    res += f"  Guruh: {datas['student_group_name']}\n"
+    res += f"  Fan: {datas['student_subject_name']}\n"
+    res += f"  Miqdor: {datas['payment_amount']}\n"
+    res += f"  Sana: {datas['payment_last_date']}\n\n"
+    res += "#tulov"
+        
+    return res
+
+
+async def create_attendance_info(datas):
+    res = "<blockquote>Davomat haqida ma'lumot</blockquote>\n\n"
+    res += f"  O'quvchi: {datas['student_fullname']}\n"
+    res += f"  Guruh: {datas['student_group_name']}\n"
+    res += f"  Fan: {datas['student_subject_name']}\n"
+    res += f"  Status: {datas['attendance_status']}\n"
+    res += f"  Sana: {datas['attendance_date']}\n\n"
+    res += "#davomat"
+        
+    return res

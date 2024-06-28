@@ -8,6 +8,7 @@ from keyboards.inline.inline_buttons import create_student_menu_btns, create_tea
 
 from loader import students, teachers, subjects, bot, ADMINS
 from keyboards.reply.default_buttons import*
+from states.Admin_states import AdminStates
 from states.Start_states import StartStates
 from states.Student_states import StudentStates
 from states.Teacher_states import TeacherStates
@@ -70,7 +71,8 @@ async def do_start(message: types.Message, state: FSMContext):
                     except Exception as error:
                         logger.exception(f"Data did not send to admin: {admin}. Error: {error}")
         else:
-            await message.answer(ADMIN_MENU)
+            await message.answer(ADMIN_MENU, reply_markup=admin_main_menu_btns)
+            await state.set_state(AdminStates.admin_main_menu)
     except Exception as error:
         logger.exception(error)
         
@@ -96,11 +98,13 @@ async def selecting_role(message: types.Message, state: FSMContext):
     
     if role==STUDENT:
         await message.answer(STUDENT_SELECT)
-        await message.answer(STUDENT_FULLNAME, reply_markup=create_btn_with_back(message.from_user.full_name+TELEGRAM_NAME_SUFFIX))
+        #await message.answer(STUDENT_FULLNAME, reply_markup=create_btn_with_back(message.from_user.full_name+TELEGRAM_NAME_SUFFIX))
+        await message.answer(STUDENT_FULLNAME, reply_markup=back_btn)
         await state.set_state(StudentStates.fullname);
     elif role==TEACHER:
         await message.answer(TEACHER_SELECT)
-        await message.answer(TEACHER_FULLNAME, reply_markup=create_btn_with_back(message.from_user.full_name+TELEGRAM_NAME_SUFFIX))
+        #await message.answer(TEACHER_FULLNAME, reply_markup=create_btn_with_back(message.from_user.full_name+TELEGRAM_NAME_SUFFIX))
+        await message.answer(TEACHER_FULLNAME, reply_markup=back_btn)
         await state.set_state(TeacherStates.fullname);
     elif role==TESTS:
         all_subjects = await subjects.select_all_subjects()
@@ -140,8 +144,3 @@ async def back_selecting(message: types.Message, state: FSMContext):
         logger.exception(f"Deleting message error: {err}")
         
         
-
-@router.message(F.photo)
-async def back_selecting(message: types.Message, state: FSMContext):
-    file_id = message.photo[-1].file_id
-    await message.reply(text=f"<code>{file_id}</code>")

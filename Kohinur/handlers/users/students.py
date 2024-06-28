@@ -394,7 +394,7 @@ async def test_ending(message: types.Message, state: FSMContext):
                       'statistics_date': datetime.now()}
         
         await statistics.upsert_statistics(stat_datas)
-
+         
         test_datas = {'student_fullname': student['student_fullname'],
                       'test_subjectname': subject['subjectname'],
                       'test_result': str(f'{result}/{all_test_count}'),

@@ -13,7 +13,7 @@ from keyboards.reply.default_buttons import*
 from keyboards.inline.inline_buttons import*
 from states.Start_states import StartStates
 from states.Teacher_states import TeacherStates
-from utils.helpers import create_all_groups_info, create_group_info, create_questions, is_contact, open_json_file
+from utils.helpers import create_all_groups_info, create_attendance_info, create_group_info, create_questions, is_contact, open_json_file
 
 
 router = Router()
@@ -47,7 +47,8 @@ async def teacher_fullname_ask(message: types.Message, state: FSMContext):
 
 @router.message(TeacherStates.subject, F.text==BACK)
 async def back_fullname_ask(message: types.Message, state: FSMContext):
-    await message.answer(TEACHER_FULLNAME, reply_markup=create_btn_with_back(message.from_user.full_name+TELEGRAM_NAME_SUFFIX))
+    #await message.answer(TEACHER_FULLNAME, reply_markup=create_btn_with_back(message.from_user.full_name+TELEGRAM_NAME_SUFFIX))
+    await message.answer(TEACHER_FULLNAME, reply_markup=back_btn)
     await state.set_state(TeacherStates.fullname);
     
 
@@ -466,10 +467,27 @@ async def teacher_click_student_attendance(callback: types.CallbackQuery, state:
     
     datas = await state.get_data()
     group_attendance = datas['current_group_attendance']
+    group = datas['teacher_current_group']
     
+    student = await students.select_student(student_id=student_id)
+    subject = await subjects.select_subject(id=group['group_subject_id'])
+    
+    attendance_datas = {
+               'student_fullname': student['student_fullname'],
+               'student_group_name': group['group_name'],
+               'student_subject_name': subject['subjectname'],
+               'attendance_status': new_status,
+               'attendance_date': date.today()
+          }
+    
+    attendance_info = await create_attendance_info(attendance_datas)
+    
+    await bot.send_message(chat_id=student['student_chat_id'], text=attendance_info)
+    await callback.answer(STUDENT_ATTENDANCE_INFOS_SENDED, show_alert=True)
+
     group_attendance[student_id] = {
-                                 'student_fullname': group_attendance[student_id]['student_fullname'],
-                                  'status': new_status      
+                                'student_fullname': group_attendance[student_id]['student_fullname'],
+                                'status': new_status      
                              }
     
     await callback.message.edit_reply_markup(reply_markup=create_attendance_group_students_btns(group_attendance=group_attendance))
@@ -499,152 +517,6 @@ async def teacher_confirm_attendance(callback: types.CallbackQuery, state: FSMCo
     await callback.message.delete()
 
 
-
-#########################################################################
-
-#                C H E C K   G R O U P   P A Y M E N T S 
-    
-
-@router.message(TeacherStates.teacher_group_selected, F.text==TEACHER_GROUP_PAYMENT)
-async def teacher_get_students_payments_list(message: types.Message, state: FSMContext):
-    datas = await state.get_data()
-    group = datas['teacher_current_group']
-    group_id = group['group_id']
-    
-    group_students = await students.select_students_by_group(student_group_id=group_id)
-    group_payments = await payments.select_payment(payment_group_id=group_id)
-    
-    if len(group_payments) == 0:
-        group_payments = {}
-        
-        for student in group_students:
-            default_payment = {
-                'payment_student_id': student['student_id'],
-                'payment_group_id': group_id,
-                'payment_amount': 0,
-                'payment_date': date.today()
-            }
-            
-            payment = await payments.upsert_payment(default_payment)
-            group_payments[student['student_id']] = {
-                'payment_id': payment['payment_id'],
-                'student_fullname': student['student_fullname'],
-                'payment_last_date': date.today(), 
-                'amount': 0 
-            }
-            
-        await state.update_data({"current_group_payments": group_payments})
-        await message.answer(STUDENT_PAYMENTS, reply_markup=create_attendance_group_payments_btns(group_payments))
-    else:
-        student_fullnames = {student['student_id']: student['student_fullname'] for student in group_students}
-        new_group_payments = {}
-        
-        for student in group_students:
-            group_student_id = student['student_id']
-            new_payment = None
-            
-            for payment in group_payments:
-                student_id = payment['payment_student_id']
-                if student_id == group_student_id:
-                    new_payment = payment
-                    break
-                
-            if new_payment:
-                new_group_payments[group_student_id] = {
-                    'payment_id': new_payment['payment_id'],
-                    'student_fullname': student_fullnames[group_student_id],
-                    'payment_last_date': new_payment['payment_date'], 
-                    'amount': new_payment['payment_amount']
-                }
-            else:
-                default_payment = {
-                    'payment_student_id': student['student_id'],
-                    'payment_group_id': group_id,
-                    'payment_amount': 0,
-                    'payment_date': date.today()
-                }
-            
-                payment = await payments.upsert_payment(default_payment)
-                new_group_payments[student['student_id']] = {
-                    'payment_id': payment['payment_id'],
-                    'student_fullname': student['student_fullname'],
-                    'payment_last_date': date.today(), 
-                    'amount': 0 
-                }
-                
-            
-        group_payments = new_group_payments
-
-        await state.update_data({"current_group_payments": new_group_payments})
-        await message.answer(STUDENT_PAYMENTS, reply_markup=create_attendance_group_payments_btns(new_group_payments))
-
-
-
-@router.callback_query(TeacherStates.teacher_group_selected, F.data.contains('student_payment'))
-async def teacher_click_student_payment(callback: types.CallbackQuery, state: FSMContext):
-    datas = callback.data.split('_')
-    action_type = datas[-2]
-    student_id = int(datas[-1])
-    
-    datas = await state.get_data()
-    group_payments = datas['current_group_payments']
-    current_payment = group_payments.get(student_id, {})
-    
-    if action_type == 'minus':
-        if current_payment['amount'] > 0:
-            current_payment['amount'] -= 10
-        
-            group_payments[student_id] = current_payment
-            await callback.message.edit_reply_markup(reply_markup=create_attendance_group_payments_btns(group_payments))
-    
-    elif action_type == 'plus':
-        current_payment['amount'] += 10
-        
-        group_payments[student_id] = current_payment
-        await callback.message.edit_reply_markup(reply_markup=create_attendance_group_payments_btns(group_payments))
-
-    elif action_type == 'update':
-        today = date.today()
-        last_payment = current_payment['payment_last_date']
-        
-        if last_payment + timedelta(days=30) <= today:
-            current_payment['payment_last_date'] = today
-            current_payment['amount'] = 0
-            await callback.answer(STUDENT_PAYMENT_DATE_UPDATE, show_alert=False)
-            
-            group_payments[student_id] = current_payment
-            await callback.message.edit_reply_markup(reply_markup=create_attendance_group_payments_btns(group_payments))
-        else:
-            await callback.answer(STUDENT_PAYMENT_DATE_ERROR, show_alert=True)
-      
-
-
-@router.callback_query(TeacherStates.teacher_group_selected, F.data=="payments_confirm")
-async def teacher_confirm_payments(callback: types.CallbackQuery, state: FSMContext):
-    datas = await state.get_data()
-    group_payments = datas['current_group_payments']
-    group_id = datas['teacher_current_group']['group_id']
-    
-    for student_id, payment_data in group_payments.items():
-        payment_update_data = {
-            'payment_id': payment_data['payment_id'],
-            'payment_student_id': student_id,
-            'payment_group_id': group_id,
-            'payment_amount': payment_data['amount'],
-            'payment_date': payment_data['payment_last_date']
-        }
-        
-        await payments.upsert_payment(payment_update_data)
-    
-    await callback.message.answer(PAYMENTS_SAVED)
-    await callback.message.delete()
-
-
-
-@router.callback_query(TeacherStates.teacher_group_selected, F.data=="payments_cancel")
-async def teacher_confirm_payments(callback: types.CallbackQuery, state: FSMContext):
-    await callback.message.delete()
-   
 
 ##########################################################################
  

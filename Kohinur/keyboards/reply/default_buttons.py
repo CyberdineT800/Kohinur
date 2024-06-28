@@ -53,11 +53,32 @@ teacher_group_menu_btns=ReplyKeyboardMarkup(
     keyboard=[
         [
             KeyboardButton(text=TEACHER_GROUP_ATTENDANCE),
-            KeyboardButton(text=TEACHER_GROUP_PAYMENT),
-            KeyboardButton(text=TEACHER_GROUP_STATS),
+            KeyboardButton(text=TEACHER_GROUP_TESTS),
         ],
         [
-            KeyboardButton(text=TEACHER_GROUP_TESTS),
+            KeyboardButton(text=BACK),
+        ],
+    ],
+    resize_keyboard=True,
+)
+
+
+admin_main_menu_btns=ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text=GROUPS),
+            #KeyboardButton(text=STATISTICS),
+        ],
+    ],
+    resize_keyboard=True,
+)
+
+
+admin_group_menu_btns=ReplyKeyboardMarkup(
+    keyboard=[
+        [
+            KeyboardButton(text=PAYMENT),
+            KeyboardButton(text=STATISTICS),
         ],
         [
             KeyboardButton(text=BACK),

@@ -38,6 +38,7 @@ class Subjects(Database):
         return await self.execute(sql, fetch=True)
     
     async def select_subject(self, **kwargs):
+        kwargs = {key: value for key, value in kwargs.items()}
         sql = "SELECT * FROM Subjects WHERE 1=1 AND "
         sql, parameters = self.format_args(sql, parameters=kwargs)
         return await self.execute(sql, *parameters, fetchrow=True)
