@@ -10,14 +10,15 @@ class Statistics(Database):
             subject_id BIGINT,
             correct_answers_count INT,
             all_tests_count INT,
-            statistics_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+            statistics_date TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+            confirm BOOLEAN DEFAULT FALSE
         );
         """
         await self.execute(sql, execute=True)
 
     async def add_statistics(self, data):
         columns = ["teacher_id", "student_id", "subject_id", 
-                   "correct_answers_count", "all_tests_count"]
+                   "correct_answers_count", "all_tests_count", "confirm"]
         placeholders = ", ".join(f"${i}" for i in range(1, len(columns) + 1))
         sql = f"INSERT INTO Statistics ({', '.join(columns)}) VALUES ({placeholders}) RETURNING *"
     
@@ -26,7 +27,8 @@ class Statistics(Database):
             data['student_id'],
             data['subject_id'],
             data['correct_answers_count'],
-            data['all_tests_count']
+            data['all_tests_count'],
+            data.get('confirm', False) 
         ]
     
         return await self.execute(sql, *values, fetchrow=True)
@@ -40,7 +42,8 @@ class Statistics(Database):
             subject_id = $4,
             correct_answers_count = $5,
             all_tests_count = $6,
-            statistics_date = $7
+            statistics_date = $7,
+            confirm = $8
         WHERE statistics_id = $1
         RETURNING *
         """
@@ -52,6 +55,7 @@ class Statistics(Database):
                                   data['correct_answers_count'],
                                   data['all_tests_count'],
                                   data['statistics_date'],
+                                  data.get('confirm', False), 
                                   fetchrow=True)
 
     async def select_all_statistics(self):
@@ -62,7 +66,7 @@ class Statistics(Database):
         kwargs = {key: value for key, value in kwargs.items()}
         sql = "SELECT * FROM Statistics WHERE 1=1 AND "
         sql, parameters = self.format_args(sql, parameters=kwargs)
-        return await self.execute(sql, *parameters, fetchrow=True)
+        return await self.execute(sql, *parameters, fetch=True)
 
     def format_args(self, sql, parameters):
         sql_parts = []

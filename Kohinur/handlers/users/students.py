@@ -263,10 +263,17 @@ async def student_menu_clicked(callback: types.CallbackQuery, state: FSMContext)
     if 'not_confirm' in data:
         datas = data.split('_')
         stat_id = int(datas[-1])
+        teacher_chat_id = int(datas[-2])
+        student_id = int(datas[-3])
+        
+        student = await students.select_student(student_id=student_id)
         
         await statistics.delete_statistics_by_id(statistics_id=stat_id)
 
         await callback.message.answer(CANCEL)
+        
+        await bot.send_message(chat_id=teacher_chat_id,
+                               text=TEST_DONT_STARTED_WHO + student['student_fullname'])
     elif 'confirm' in data:
         datas = data.split('_')
         stat_id = int(datas[-1])
@@ -274,7 +281,7 @@ async def student_menu_clicked(callback: types.CallbackQuery, state: FSMContext)
         student_id = int(datas[-3])
 
         statistic = await statistics.select_statistics(statistics_id=stat_id)
-        start_date = statistic['statistics_date']
+        start_date = statistic[0]['statistics_date']
         now = datetime.now()
         
         if (now - start_date).total_seconds() <= 86400:
@@ -282,6 +289,19 @@ async def student_menu_clicked(callback: types.CallbackQuery, state: FSMContext)
                                      'current_student_id': student_id})
             await state.set_state(StudentStates.start_test)
         
+            confirmed_stat = {
+                   'statistics_id': stat_id,
+                   'teacher_id': statistic[0]['teacher_id'],
+                   'student_id': statistic[0]['student_id'],
+                   'subject_id': statistic[0]['subject_id'],
+                   'correct_answers_count': statistic[0]['correct_answers_count'],
+                   'all_tests_count': statistic[0]['all_tests_count'],
+                   'statistics_date': statistic[0]['statistics_date'],
+                   'confirm': True,
+                }
+
+            await statistics.update_statistics(confirmed_stat)
+
             state_with: FSMContext = FSMContext(
             storage=dispatcher.storage, 
             key=StorageKey(

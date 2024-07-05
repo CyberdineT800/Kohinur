@@ -35,7 +35,7 @@ def create_test_accepting_btns (student_id, teacher_chat_id, stat_id):
     inline_keyboard = [
         [
             InlineKeyboardButton(text=YES_TEXT, callback_data=f'test_confirm_{student_id}_{teacher_chat_id}_{stat_id}'),
-            InlineKeyboardButton(text=NO_TEXT, callback_data=f'test_not_confirm_{stat_id}'),
+            InlineKeyboardButton(text=NO_TEXT, callback_data=f'test_not_confirm_{student_id}_{teacher_chat_id}_{stat_id}'),
         ],
     ]
     
@@ -188,6 +188,49 @@ def create_attendance_group_payments_btns(group_payments):
 
 
 
+def create_day_btns(selected_days):
+    inline_keyboard = []
+    row = []
+    i = 0
+    added = False
+    
+    for day, selected in selected_days.items():
+        status = "✅" if selected else "❌"
+        
+        row.append(InlineKeyboardButton(text=f"{day} {status}", callback_data=f"days_{day}"))
+        
+        if i >= 3 and not added:
+            inline_keyboard.append(row)
+            row = []
+            added = True
+
+        i += 1
+
+    inline_keyboard.append(row)
+    inline_keyboard.append([InlineKeyboardButton(text=CONFIRM, callback_data="days_confirm")])
+    
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+
+
+def create_day_time_btns(selected_days, selected_times):
+    inline_keyboard = []
+    
+    for day, selected in selected_days.items():
+        if selected:
+            row = []
+            time = selected_times[day]
+            row.append(InlineKeyboardButton(text=f"{day} -> {time:02d}:00", callback_data=f"times_{day}"))
+            row.append(InlineKeyboardButton(text="🔽", callback_data=f"times_{day}_decrease"))
+            row.append(InlineKeyboardButton(text="🔼", callback_data=f"times_{day}_increase"))
+            inline_keyboard.append(row)
+            
+    inline_keyboard.append([InlineKeyboardButton(text=CONFIRM, callback_data="times_confirm")])
+    
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+
+
 inline_keyboard = [
     [
         InlineKeyboardButton(text="-5", callback_data='test_count_remove'),
@@ -199,4 +242,5 @@ inline_keyboard = [
 ]
 
 test_count_btns = InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
 

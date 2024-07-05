@@ -13,7 +13,7 @@ from keyboards.reply.default_buttons import*
 from keyboards.inline.inline_buttons import*
 from states.Start_states import StartStates
 from states.Teacher_states import TeacherStates
-from utils.helpers import create_all_groups_info, create_attendance_info, create_group_info, create_questions, is_contact, open_json_file
+from utils.helpers import create_all_groups_info, create_attendance_info, create_group_info, create_new_group_info, create_questions, is_contact, open_json_file, string_to_weekday
 
 
 router = Router()
@@ -467,23 +467,6 @@ async def teacher_click_student_attendance(callback: types.CallbackQuery, state:
     
     datas = await state.get_data()
     group_attendance = datas['current_group_attendance']
-    group = datas['teacher_current_group']
-    
-    student = await students.select_student(student_id=student_id)
-    subject = await subjects.select_subject(id=group['group_subject_id'])
-    
-    attendance_datas = {
-               'student_fullname': student['student_fullname'],
-               'student_group_name': group['group_name'],
-               'student_subject_name': subject['subjectname'],
-               'attendance_status': new_status,
-               'attendance_date': date.today()
-          }
-    
-    attendance_info = await create_attendance_info(attendance_datas)
-    
-    await bot.send_message(chat_id=student['student_chat_id'], text=attendance_info)
-    await callback.answer(STUDENT_ATTENDANCE_INFOS_SENDED, show_alert=True)
 
     group_attendance[student_id] = {
                                 'student_fullname': group_attendance[student_id]['student_fullname'],
@@ -504,6 +487,9 @@ async def teacher_confirm_attendance(callback: types.CallbackQuery, state: FSMCo
     student_ids = group_attendance.keys()
     
     for student_id in student_ids:
+        student = await students.select_student(student_id=student_id)
+        subject = await subjects.select_subject(id=group['group_subject_id'])
+    
         attendance_date = {
                 'attendance_student_id': student_id,
                 'attendance_group_id': group['group_id'],
@@ -511,8 +497,22 @@ async def teacher_confirm_attendance(callback: types.CallbackQuery, state: FSMCo
                 'attendance_status': group_attendance[student_id]['status']
             }
         
+        attendance_datas = {
+               'student_fullname': student['student_fullname'],
+               'student_group_name': group['group_name'],
+               'student_subject_name': subject['subjectname'],
+               'attendance_status': group_attendance[student_id]['status'],
+               'attendance_date': date.today()
+          }
+        
         await attendance.upsert_attendance(data=attendance_date)
         
+        attendance_info = await create_attendance_info(attendance_datas)
+    
+        await bot.send_message(chat_id=student['student_chat_id'], text=attendance_info)
+        await callback.answer(STUDENT_ATTENDANCE_INFOS_SENDED, show_alert=True)
+        
+
     await callback.message.answer(ATTENDANCE_SAVED)
     await callback.message.delete()
 
@@ -559,40 +559,208 @@ async def teacher_read_new_group_name(message: types.Message, state: FSMContext)
         await state.set_state(TeacherStates.teacher_new_group_subject)
         await state.update_data({"teacher_new_group_name": group_name})
         
-        await message.answer(group_name + '\n' + ACCEPTED)
-        await message.answer(SUBJECTS_SELECT, reply_markup=subject_btns(all_subjects))
+        await message.answer(group_name + '\n' + ACCEPTED, reply_markup=back_btn)
+        await message.answer(ASK_NEW_GROUP_SUBJECT, reply_markup=subject_btns(all_subjects))
         
 
 
 @router.message(TeacherStates.teacher_new_group_subject, F.text==BACK)
-async def teacher_start_menu_back(message: types.Message, state: FSMContext):
-    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1);
+async def teacher_new_group_name_back(message: types.Message, state: FSMContext):
     await message.answer(ASK_NEW_GROUP_NAME, reply_markup=back_btn)
+    await state.set_state(TeacherStates.teacher_new_group_start)
     
-    await state.set_state(TeacherStates.teacher_new_group_start);
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1);
  
 
 
-@router.callback_query(TeacherStates.teacher_test_subject_selecting, F.data.contains('subject_'))
-async def teacher_test_count_ask(callback: types.CallbackQuery, state: FSMContext):
+@router.callback_query(TeacherStates.teacher_new_group_subject, F.data.contains('subject_'))
+async def teacher_read_new_group_subject(callback: types.CallbackQuery, state: FSMContext):
     subject_id = int(callback.data.split('_')[1])
     subject = await subjects.select_subject(id=subject_id)
     
-    if subject['numberofavailabletests'] == 0:
-        await callback.answer(TESTS_NOT_FOUND, show_alert=True)
-    else:
-        try:
-            await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        
-            await callback.message.answer(subject['subjectname'] + '\n' + ACCEPTED)
-            await callback.message.answer(AVAILABLE_TESTS_COUNT + str(subject['numberofavailabletests']), reply_markup=back_btn)
-            await callback.message.answer(TEST_COUNT + "5", reply_markup=test_count_btns)
-        
-            await state.update_data({'teacher_current_test_subject': subject})
-            await state.set_state(TeacherStates.teacher_test_count_selecting)
-        except Exception as err:
-            logging.exception(f"Error tests.test_start: {err}")    
+    await state.set_state(TeacherStates.teacher_new_group_days)
+    await state.update_data({"teacher_new_group_subject": subject})  
+
+    await callback.message.answer(subject['subjectname'] + "\n" + ACCEPTED, reply_markup=back_btn)
     
+    selected_days = {day: False for day in DAYS_OF_WEEK}
+    await state.update_data({"teacher_new_group_days": selected_days})
+    await callback.message.answer(ASK_NEW_GROUP_DAYS, reply_markup=create_day_btns(selected_days=selected_days))
+    
+
+    await callback.message.delete()
+
+
+@router.message(TeacherStates.teacher_new_group_days, F.text==BACK)
+async def teacher_new_group_subject_back(message: types.Message, state: FSMContext):
+    all_subjects = await subjects.select_all_subjects()
+
+    if not all_subjects:
+        await message.answer(SUBJECTS_NOT_FOUND)
+    else:
+        await state.set_state(TeacherStates.teacher_new_group_subject)
+        await message.answer(ASK_NEW_GROUP_SUBJECT, reply_markup=subject_btns(all_subjects))
+    
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1);
+        
+ 
+@router.callback_query(TeacherStates.teacher_new_group_days, F.data.contains('days_'))
+async def teacher_read_new_group_days(callback: types.CallbackQuery, state: FSMContext):
+    day = callback.data.replace("days_", "").strip()
+    datas = await state.get_data()
+    
+    selected_days = datas["teacher_new_group_days"]
+
+    if day != 'confirm':
+        selected_days[day] = not selected_days[day]
+        await callback.message.edit_reply_markup(reply_markup=create_day_btns(selected_days=selected_days))
+    else:
+        selected = [day for day, selected in selected_days.items() if selected]
+        selected_count = len(selected)
+
+        if selected_count > 0:
+            await state.set_state(TeacherStates.teacher_new_group_times)
+            
+            days = ""
+            
+            for day in selected:
+                days += string_to_weekday(day) + "\n"
+            
+            selected_times = {day: 14 for day in DAYS_OF_WEEK}
+            await state.update_data({'teacher_new_group_times': selected_times})
+
+            await callback.message.answer(days + "\n" + ACCEPTED, reply_markup=back_btn)
+            await callback.message.answer(ASK_NEW_GROUP_TIMES, reply_markup=create_day_time_btns(selected_days=selected_days,
+                                                                                                 selected_times=selected_times))
+
+            await callback.message.delete();
+        else:
+            await callback.answer(DAYS_OF_WEEK_ERROR, show_alert=True)
+    
+
+ 
+            
+@router.message(TeacherStates.teacher_new_group_times, F.text==BACK)
+async def teacher_new_group_days_back(message: types.Message, state: FSMContext):
+    selected_days = {day: False for day in DAYS_OF_WEEK}
+    
+    await state.update_data({"teacher_new_group_days": selected_days})
+    await state.set_state(TeacherStates.teacher_new_group_days)
+
+    await message.answer(ASK_NEW_GROUP_DAYS, reply_markup=create_day_btns(selected_days=selected_days))
+    
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1);
+
+
+
+@router.callback_query(TeacherStates.teacher_new_group_times, F.data.contains('times_'))
+async def teacher_read_new_group_times(callback: types.CallbackQuery, state: FSMContext):
+    datas = callback.data.split('_')
+    day = datas[1].strip()
+    
+    if len(datas) == 2:
+        if day == 'confirm':
+            datas = await state.get_data()
+            group_name = datas['teacher_new_group_name']
+            subject = datas['teacher_new_group_subject']
+            selected_days = datas['teacher_new_group_days']
+            selected_times = datas['teacher_new_group_times']
+            
+            selected = [day for day, selected in selected_days.items() if selected]
+            times = []
+            res = f"Guruh nomi: {group_name}\n"
+            res += f"Fan: {subject['subjectname']}\n"  
+            
+            for day in selected:
+                time = f"{selected_times[day]}:00-{selected_times[day] + 2}:00"
+                
+                times.append(time)
+                res += f"{string_to_weekday(day)}: {time}\n"
+                
+            await state.update_data({'teacher_new_group_days': ",".join(selected)})
+            await state.update_data({'teacher_new_group_times': ','.join(times)})
+            await state.set_state(TeacherStates.teacher_new_group_accepting)
+            
+            await callback.message.answer(res + "\n" + ACCEPTED, reply_markup=create_btn_with_back(CONFIRM))
+            await callback.message.delete()
+        else:
+            await callback.answer(string_to_weekday(day), show_alert=False)
+    else:
+        action = datas[2].strip()
+
+        datas = await state.get_data()
+        selected_days = datas['teacher_new_group_days']
+        selected_times = datas['teacher_new_group_times']
+
+        if action == 'decrease':
+            if selected_times[day] <= 19 and selected_times[day] >= 5:
+                selected_times[day] -= 1
+                
+                await callback.message.edit_reply_markup(reply_markup=create_day_time_btns(selected_days=selected_days,
+                                                                                           selected_times=selected_times))
+            else:
+                await callback.answer(NEW_GROUP_TIMES_ERROR, show_alert=False)
+        elif action == 'increase':
+            if selected_times[day] <= 19 and selected_times[day] >= 5:
+                selected_times[day] += 1
+                
+                await callback.message.edit_reply_markup(reply_markup=create_day_time_btns(selected_days=selected_days,
+                                                                                           selected_times=selected_times))
+            else:
+                await callback.answer(NEW_GROUP_TIMES_ERROR, show_alert=False)
+                
+        await state.update_data({'teacher_new_group_times': selected_times})
+
+  
+
+@router.message(TeacherStates.teacher_new_group_accepting, F.text==BACK)
+async def teacher_new_group_days_back(message: types.Message, state: FSMContext):
+    selected_days = {day: False for day in DAYS_OF_WEEK}
+    
+    await state.update_data({"teacher_new_group_days": selected_days})
+    await state.set_state(TeacherStates.teacher_new_group_days)
+
+    await message.answer(ASK_NEW_GROUP_DAYS, reply_markup=create_day_btns(selected_days=selected_days))
+    
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1);
+
+
+
+@router.message(TeacherStates.teacher_new_group_accepting, F.text==CONFIRM)
+async def teacher_new_group_accepted(message: types.Message, state: FSMContext):
+    datas = await state.get_data()
+    group_name = datas['teacher_new_group_name']
+    teacher = datas['current_teacher']
+    subject = datas['teacher_new_group_subject']
+    selected_days = datas['teacher_new_group_days']
+    selected_times = datas['teacher_new_group_times']
+    
+    new_group_datas = {
+            'group_name': group_name,
+            'group_teacher_id': teacher['teacher_id'],
+            'group_subject_id': subject['id'],
+            'group_days': selected_days,
+            'group_times': selected_times
+        }
+    
+    await groups.add_group(new_group_datas)
+    
+    new_group_info = await create_new_group_info(datas)
+
+    for admin in ADMINS:
+        try:
+            await bot.send_message(
+                chat_id=admin['chat_id'],
+                text=new_group_info
+            )
+        except Exception as error:
+            logger.exception(f"New group infos did not send to admin: {admin}. Error: {error}")
+
+    await message.answer(NEW_GROUP_CREATED, reply_markup=teacher_add_group_btn)
+    await message.answer(text=RETRY_SELECTING,  reply_markup=create_teacher_menu_btns(teacher['teacher_id']))
+                    
+    await state.set_state(TeacherStates.waiting_select)
+    await state.update_data({'current_teacher': teacher})
 
 
 ##########################################################################

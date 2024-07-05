@@ -17,3 +17,4 @@ class TeacherStates(StatesGroup):
     teacher_new_group_subject = State()
     teacher_new_group_days = State()
     teacher_new_group_times = State()
+    teacher_new_group_accepting = State()

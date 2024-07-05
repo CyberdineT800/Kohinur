@@ -3,7 +3,7 @@ import random
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, reply_keyboard_markup
 
-from data.text_values import TESTS_READY_ERROR
+from data.text_values import NEW_GROUP_CREATED, TESTS_READY_ERROR
 
 
 def open_json_file(f_name):
@@ -123,6 +123,19 @@ def give_all_weekdays(days):
         res.append(string_to_weekday(day))
         
     return ", ".join(res)
+
+
+async def create_new_group_info (datas):
+    res = f"<blockquote> {NEW_GROUP_CREATED} </blockquote>\n\n"
+        
+    res += f"     Guruh nomi: {datas['teacher_new_group_name']}\n"
+    res += f"     O'qituvchi: {datas['current_teacher']['teacher_fullname']}\n"
+    res += f"     Fan: {datas['teacher_new_group_subject']['subjectname']}\n"
+    res += f"     Dars kunlari: {datas['teacher_new_group_days']}\n"
+    res += f"     Dars vaqtlari: {datas['teacher_new_group_times']}\t"
+    res += f"   (dars vaqtlari kunlarga mos ravishda berilgan)"
+    
+    return res
 
 
 async def create_group_info (group, group_students_count, index = -1):
