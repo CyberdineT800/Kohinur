@@ -13,7 +13,7 @@ from keyboards.reply.default_buttons import*
 from keyboards.inline.inline_buttons import*
 from states.Start_states import StartStates
 from states.Teacher_states import TeacherStates
-from utils.helpers import create_all_groups_info, create_attendance_info, create_group_info, create_new_group_info, create_questions, is_contact, open_json_file, string_to_weekday
+from utils.helpers import create_all_groups_info, create_attendance_info, create_group_info, create_new_group_info, create_questions, is_contact, open_json_file, process_excel_file, string_to_weekday
 
 
 router = Router()
@@ -177,7 +177,17 @@ async def teacher_menu_clicked(callback: types.CallbackQuery, state: FSMContext)
     await state.update_data({'current_teacher': teacher})
 
     if 'test' in selection:
-        pass
+        all_subjects = await subjects.select_all_subjects()
+
+        if not all_subjects:
+            await callback.message.answer(SUBJECTS_NOT_FOUND)
+        else:
+            await state.set_state(TeacherStates.teacher_adding_new_test_subject)
+        
+            await callback.message.answer(TEACHER_TEST_ADD_START, reply_markup=back_btn)
+            await callback.message.answer(SUBJECTS_SELECT, reply_markup=subject_btns(all_subjects))
+            
+            await callback.message.delete()
     elif 'group' in selection:
         teacher_groups = await groups.select_groups_by_teacher(teacher_id=teacher_id)
         
@@ -244,6 +254,8 @@ async def teacher_group_selected(callback: types.CallbackQuery, state: FSMContex
 
 
 @router.message(TeacherStates.teacher_group_selected, F.text==BACK)
+@router.message(TeacherStates.teacher_adding_new_test_subject, F.text==BACK)
+@router.message(TeacherStates.teacher_adding_new_test_file, F.text==BACK)
 async def teacher_groups_menu_back(message: types.Message, state: FSMContext):
     datas = await state.get_data()
     teacher = datas['current_teacher']
@@ -253,6 +265,73 @@ async def teacher_groups_menu_back(message: types.Message, state: FSMContext):
                     
     await state.set_state(TeacherStates.waiting_select)
     await state.update_data({'current_teacher': teacher})
+    
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id - 1)
+    await bot.delete_message(chat_id=message.chat.id, message_id=message.message_id)
+
+
+
+
+##########################################################################
+ 
+#       A D D   N E W   T E S T S   F R O M    .X L S X   F I L E        #
+
+
+@router.callback_query(TeacherStates.teacher_adding_new_test_subject, F.data.contains('subject_'))
+async def teacher_new_test_subject_read(callback: types.CallbackQuery, state: FSMContext):
+    subject_id = int(callback.data.split('_')[1])
+    subject = await subjects.select_subject(id=subject_id)
+    
+    await state.update_data({"new_test_subject": subject})
+    await state.set_state(TeacherStates.teacher_adding_new_test_file)
+    
+    await callback.message.answer(subject['subjectname'] + "\n" + ACCEPTED)
+    await callback.message.answer(ASK_FILE, reply_markup=back_btn)
+    
+    await callback.message.delete()
+
+
+    
+@router.message(TeacherStates.teacher_adding_new_test_file, F.document)
+async def teacher_read_tests_file(message: types.Message, state: FSMContext):
+    document = message.document
+    file = await bot.get_file(file_id=document.file_id)
+    
+    file_name_parts = document.file_name.split('.')
+    
+    if file_name_parts[-1] in FILE_TYPES:
+        datas = await state.get_data()
+        
+        subject = datas['new_test_subject']
+        
+        timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
+        base_filename = file_name_parts[:-1]
+        destination = f"./ExcelFiles/Tests/{base_filename}-{subject['subjectname']}-{timestamp}.{file_name_parts[-1]}"
+        
+        await state.update_data({'new_test_file': file})
+        await bot.download_file(file_path=file.file_path, destination=destination)
+        
+        await message.answer(ACCEPTED)
+        await message.answer(FILE_ACCEPTING, reply_markup=back_btn)
+        
+        res, count = await process_excel_file(tests, destination, subject['id'])
+        
+        if res:
+            update_subject_datas = {
+                    'id': subject['id'],
+                    'subjectname': subject['subjectname'],
+                    'numberofavailabletests': (count + int(subject['numberofavailabletests'])),
+                    'subjectprice': subject['subjectprice']
+                }
+            
+            await subjects.update_subject(update_subject_datas)
+
+            await message.reply(FILE_ACCEPT)
+        else:
+            await message.reply(FILE_UNACCEPT)
+    else:
+        await message.answer(FILE_TYPE_ERROR)
+        await message.answer(ASK_FILE, reply_markup=back_btn)
 
 
 

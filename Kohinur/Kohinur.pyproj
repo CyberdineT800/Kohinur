@@ -78,6 +78,8 @@
   <ItemGroup>
     <Folder Include="data\" />
     <Folder Include="ExcelFiles\" />
+    <Folder Include="ExcelFiles\Stats\" />
+    <Folder Include="ExcelFiles\Tests\" />
     <Folder Include="filters\" />
     <Folder Include="handlers\" />
     <Folder Include="handlers\channels\" />

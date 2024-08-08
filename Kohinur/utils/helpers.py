@@ -1,5 +1,7 @@
 import json
+import logging
 import random
+import openpyxl
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, reply_keyboard_markup
 
@@ -188,3 +190,35 @@ async def create_attendance_info(datas):
     res += "#davomat"
         
     return res
+
+
+
+async def process_excel_file(tests_table, file_path, subject_id):
+     try:
+        wb = openpyxl.load_workbook(file_path)
+        ws = wb.active
+        count = 0
+
+        for row in ws.iter_rows(min_row=1, values_only=True):
+            question_text = row[0]
+            if not question_text:
+                break
+            question_photo_id = row[1] if row[1] else None
+            answers = [ans for ans in row[2:6] if ans]
+            correct_answer_index = int(row[6])
+
+            data = {
+                'subjectid': subject_id,
+                'questiontxt': question_text,
+                'questionphotoid': question_photo_id,
+                'answers': json.dumps(answers),  
+                'correctanswerindex': correct_answer_index
+            }
+
+            test = await tests_table.add_test(data)
+            count += 1
+
+        return (True, count)
+     except Exception as err:
+         logging.exception(f"Error adding new tests : {err}")
+         return (False, 0)
