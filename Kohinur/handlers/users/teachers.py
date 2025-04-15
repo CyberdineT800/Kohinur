@@ -8,12 +8,12 @@ from aiogram.client.session.middlewares.request_logging import logger
 
 from data.text_values import *
 
-from loader import teachers, attendance, payments, statistics, tests, students, groups, subjects, bot, ADMINS, dispatcher
+from loader import teachers, attendance, payments, statistics, tests, test_files, students, groups, subjects, bot, ADMINS, dispatcher
 from keyboards.reply.default_buttons import*
 from keyboards.inline.inline_buttons import*
 from states.Start_states import StartStates
 from states.Teacher_states import TeacherStates
-from utils.helpers import create_all_groups_info, create_attendance_info, create_group_info, create_new_group_info, create_questions, is_contact, open_json_file, process_excel_file, string_to_weekday
+from utils.helpers import create_all_groups_info, create_all_test_files_info, create_attendance_info, create_group_info, create_new_group_info, create_questions, is_contact, open_json_file, process_excel_file, string_to_weekday
 
 
 router = Router()
@@ -305,16 +305,24 @@ async def teacher_read_tests_file(message: types.Message, state: FSMContext):
         subject = datas['new_test_subject']
         
         timestamp = datetime.now().strftime("%Y-%m-%d_%H-%M-%S")
-        base_filename = file_name_parts[:-1]
+        base_filename = '.'.join(file_name_parts[:-1])
         destination = f"./ExcelFiles/Tests/{base_filename}-{subject['subjectname']}-{timestamp}.{file_name_parts[-1]}"
         
-        await state.update_data({'new_test_file': file})
+        await state.update_data({'new_test_file': document.file_id})
         await bot.download_file(file_path=file.file_path, destination=destination)
         
         await message.answer(ACCEPTED)
         await message.answer(FILE_ACCEPTING, reply_markup=back_btn)
         
-        res, count = await process_excel_file(tests, destination, subject['id'])
+        test_file_data = {
+                'test_subject_id': subject['id'],
+                'test_teacher_id': datas.get('current_teacher', 1)['teacher_id'],
+                'test_file_tid': document.file_id,
+                'test_file_name': base_filename
+            }
+        test_file = await test_files.add_test_file(test_file_data)
+
+        res, count = await process_excel_file(tests, destination, test_file['test_file_id'], subject['id'])
         
         if res:
             update_subject_datas = {
@@ -323,12 +331,12 @@ async def teacher_read_tests_file(message: types.Message, state: FSMContext):
                     'numberofavailabletests': (count + int(subject['numberofavailabletests'])),
                     'subjectprice': subject['subjectprice']
                 }
-            
             await subjects.update_subject(update_subject_datas)
 
             await message.reply(FILE_ACCEPT)
         else:
             await message.reply(FILE_UNACCEPT)
+            await test_files.delete_test_file_by_id(test_file['test_file_id'])
     else:
         await message.answer(FILE_TYPE_ERROR)
         await message.answer(ASK_FILE, reply_markup=back_btn)
@@ -363,30 +371,37 @@ async def teacher_group_menu_back(message: types.Message, state: FSMContext):
     await state.set_state(TeacherStates.teacher_group_selected)
     await message.answer(RETRY_SELECTING, reply_markup=teacher_group_menu_btns)
 
-
-
+        
 @router.callback_query(TeacherStates.teacher_test_subject_selecting, F.data.contains('subject_'))
-async def teacher_test_count_ask(callback: types.CallbackQuery, state: FSMContext):
+async def teacher_test_file_ask(callback: types.CallbackQuery, state: FSMContext):
     subject_id = int(callback.data.split('_')[1])
     subject = await subjects.select_subject(id=subject_id)
     
-    if subject['numberofavailabletests'] == 0:
-        await callback.answer(TESTS_NOT_FOUND, show_alert=True)
-    else:
-        try:
-            await bot.delete_message(callback.message.chat.id, callback.message.message_id)
-        
-            await callback.message.answer(subject['subjectname'] + '\n' + ACCEPTED)
-            await callback.message.answer(AVAILABLE_TESTS_COUNT + str(subject['numberofavailabletests']), reply_markup=back_btn)
-            await callback.message.answer(TEST_COUNT + "5", reply_markup=test_count_btns)
-        
-            await state.update_data({'teacher_current_test_subject': subject})
-            await state.set_state(TeacherStates.teacher_test_count_selecting)
-        except Exception as err:
-            logging.exception(f"Error teachers.teacher_test_count_ask: {err}")    
+    # if subject['numberofavailabletests'] == 0:
+    #     await callback.answer(TESTS_NOT_FOUND, show_alert=True)
+    # else:
+    try:
+        await bot.delete_message(callback.message.chat.id, callback.message.message_id)
+            
+        await callback.message.answer(subject['subjectname'] + '\n' + ACCEPTED)
+        await state.update_data({'teacher_current_test_subject': subject,
+                                 'all_tests_count': subject['numberofavailabletests']})
+            
+        datas = await state.get_data()
+
+        test_fls = await test_files.select_test_files(test_teacher_id=datas.get('current_teacher', 1)['teacher_id'],
+                                                      test_subject_id=subject_id)
+
+        test_file_infos = await create_all_test_files_info(test_fls)
+        await callback.message.answer(TEST_FILE_SELECT, reply_markup=back_btn)
+        await callback.message.answer(test_file_infos, reply_markup=create_select_test_file_btns(test_files=test_fls))
+
+        await state.set_state(TeacherStates.teacher_test_file_selecting)
+    except Exception as err:
+        logging.exception(f"Error teachers.teacher_test_file_ask: {err}")    
     
 
-@router.message(TeacherStates.teacher_test_subject_selecting, F.text==BACK)
+@router.message(TeacherStates.teacher_test_file_selecting, F.text==BACK)
 async def teacher_test_subject_back(message: types.Message, state: FSMContext):    
     all_subjects = await subjects.select_all_subjects()
 
@@ -399,17 +414,69 @@ async def teacher_test_subject_back(message: types.Message, state: FSMContext):
         await message.answer(SUBJECTS_SELECT, reply_markup=subject_btns(all_subjects))
 
 
+@router.callback_query(TeacherStates.teacher_test_file_selecting, F.data.startswith('test_file_page_'))
+async def paginate_test_files(callback: types.CallbackQuery, state: FSMContext):
+    await state.set_state(TeacherStates.teacher_test_file_selecting)
+    datas = await state.get_data()
+
+    page = callback.data.split('_')[-1]
+    
+    if page != 'random':
+        page = int(page)
+        datas = await state.get_data()
+        subject_id = datas['teacher_current_test_subject']['id']
+        
+        test_fls = await test_files.select_test_files(test_teacher_id=datas.get('current_teacher', 1)['teacher_id'],
+                                                     test_subject_id=subject_id)
+        test_file_infos = await create_all_test_files_info(test_files=test_fls,
+                                                           page=page)
+    
+        await callback.message.edit_text(test_file_infos, 
+                                         reply_markup=create_select_test_file_btns(test_file=test_fls, page=page))
+
+    else:
+        await callback.message.answer(AVAILABLE_TESTS_COUNT + str(datas['all_tests_count']), reply_markup=back_btn)
+        await callback.message.answer(TEST_COUNT + "5", reply_markup=test_count_btns)
+        
+        await state.update_data({'test_file_id': 0})
+        await state.set_state(TeacherStates.teacher_test_count_selecting)
+        await callback.message.delete()
+
+
+@router.callback_query(TeacherStates.teacher_test_file_selecting, F.data.startswith('teacher_select_test_file_'))
+async def teacher_test_file_selected(callback: types.CallbackQuery, state: FSMContext):
+    test_file_id = int(callback.data.split('_')[-1])
+
+    count = len(list(await tests.select_test(testfileid=test_file_id)))
+    await state.update_data({'all_tests_count': count,
+                             'test_file_id': test_file_id})
+
+    await callback.message.answer(AVAILABLE_TESTS_COUNT + str(count), reply_markup=back_btn)
+    await callback.message.answer(TEST_COUNT + "5", reply_markup=test_count_btns)
+
+    await state.set_state(TeacherStates.teacher_test_count_selecting)
+    await callback.message.delete()
+
+
 @router.callback_query(TeacherStates.teacher_test_count_selecting, F.data.startswith('test_count_'))
 async def teacher_selecting_test_count(callback: types.CallbackQuery, state: FSMContext):
     action = callback.data.replace('test_count_', '').strip()
     count = int(callback.message.text.replace(TEST_COUNT, ''))
+
+    await state.update_data({'teacher_current_test_count': count})
+    datas = await state.get_data()
+
+    subject = datas['teacher_current_test_subject']
     
     if action == 'add':
-        count = count + 5
-        await bot.edit_message_text(text=TEST_COUNT+str(count), \
-                                    chat_id=callback.message.chat.id, \
-                                    message_id=callback.message.message_id, \
-                                    reply_markup=test_count_btns)
+        if count + 5 <= datas['all_tests_count']:
+            count = count + 5
+            await bot.edit_message_text(text=TEST_COUNT+str(count), \
+                                        chat_id=callback.message.chat.id, \
+                                        message_id=callback.message.message_id, \
+                                        reply_markup=test_count_btns)
+        else:
+            await callback.answer(TEST_COUNT_ERROR, show_alert=True)
     elif action == 'remove':
         if count > 5:
             count = count - 5
@@ -421,14 +488,9 @@ async def teacher_selecting_test_count(callback: types.CallbackQuery, state: FSM
             await callback.answer(TEST_COUNT_ERROR, show_alert=True)
     elif action == 'confirm':
         try:
-            await state.update_data({'teacher_current_test_count': count})
-
-            datas = await state.get_data()
-            available_test_count = datas['teacher_current_test_subject']['numberofavailabletests']
-            
-            if available_test_count >= count:
+            if datas['all_tests_count'] >= count:
                 group_students = await students.select_students_by_group(student_group_id=datas['teacher_current_group']['group_id'])
-
+               
                 sended = 0
                 sended_msg_ids = []
                 sended_chat_ids = []
@@ -439,7 +501,7 @@ async def teacher_selecting_test_count(callback: types.CallbackQuery, state: FSM
                     try:
                         stat_datas = {'teacher_id': datas['current_teacher']['teacher_id'],
                                       'student_id': student['student_id'],
-                                      'subject_id': datas['teacher_current_test_subject']['id'],
+                                      'subject_id': subject['id'],
                                       'correct_answers_count': 0,
                                       'all_tests_count': count,
                                       'statistics_date': datetime.now()}
@@ -450,7 +512,8 @@ async def teacher_selecting_test_count(callback: types.CallbackQuery, state: FSM
                                                      text=test_info,
                                                      reply_markup=create_test_accepting_btns(student_id=student['student_id'],
                                                                                              teacher_chat_id=datas['current_teacher']['teacher_chat_id'],
-                                                                                             stat_id=stat['statistics_id']))
+                                                                                             stat_id=stat['statistics_id'],
+                                                                                             test_file_id=datas['test_file_id']))
                         await bot.send_message(chat_id=int(student['student_chat_id']),
                                                text=TEST_TIME_NOTIFY)
                         
@@ -473,7 +536,8 @@ async def teacher_selecting_test_count(callback: types.CallbackQuery, state: FSM
             else:
                 await callback.answer(AVAILABLE_TESTS_COUNT_ERROR, show_alert=True)
         except Exception as err:
-            await callback.answer(str(err), show_alert=True)
+            #await callback.answer(str(err), show_alert=True)
+            logging.exception(f"Error in sending questions: {err}")
             print(f"Error sending questions: {err}")
 
 

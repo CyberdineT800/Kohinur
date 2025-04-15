@@ -68,6 +68,22 @@ class Statistics(Database):
         sql, parameters = self.format_args(sql, parameters=kwargs)
         return await self.execute(sql, *parameters, fetch=True)
 
+    async def select_grouped_statistics_by_student(self, student_id: int):
+        sql = """
+        SELECT 
+            s.confirm,
+            s.subject_id,
+            sj.subjectname,
+            SUM(s.correct_answers_count) AS total_correct,
+            SUM(s.all_tests_count) AS total_tests
+        FROM statistics s
+        JOIN subjects sj ON s.subject_id = sj.id
+        WHERE s.student_id = $1
+        GROUP BY s.confirm, s.subject_id, sj.subjectname
+        ORDER BY s.confirm DESC, sj.subjectname
+        """
+        return await self.execute(sql, student_id, fetch=True)
+
     def format_args(self, sql, parameters):
         sql_parts = []
         args = []

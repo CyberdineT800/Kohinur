@@ -6,7 +6,6 @@ ADMIN_NOTE = \
 bazaga saqlangan!"""
 
 
-
 # USER
 #### NEW USER
 WELCOME = \
@@ -23,6 +22,7 @@ STUDENT_PAYMENT_DATE_UPDATE = """Oxirgi to'lov sanasi o'zgartirildi va ma'lumot 
 STUDENT_ATTENDANCE_INFOS_SENDED = """Davomat statusi o'quvchilarga yuborildi!"""
 STUDENT_SELECT = """O'quvchi sifatida ro'yxatdan o'tish"""
 STUDENT_GROUPS = """Guruhlarim"""
+STUDENT_RESULTS = """Natijalarim"""
 STUDENT_SUBJECTS = """Fanlarim"""
 STUDENT_FULLNAME = """Ism-familiyangizni kiriting: """
 STUDENT_SELECT_SUBJECT = """O'qimoqchi bo'lgan faningiz: """
@@ -107,10 +107,14 @@ TEST_TIME_NOTIFY = """Ushbu testni 1 kun muddat ichida topshirishingiz mumkin!""
 TEST_TIME_ENDED = """Ushbu testni topshirish muddati o'tib ketgan!"""
 TESTS_NOT_FOUND = """Hozircha testlar qo'shilmagan!"""
 TEST_COUNT = """Savollar sonini belgilang: """
-TEST_COUNT_ERROR = """Savollar soni 5 tadan kam bo'lmasinda eeee !"""
+TEST_COUNT_ERROR = """Savollar soni juda kam yoki ko'p !"""
 TESTS_READING = """Savollar tayyorlanmoqda..."""
 TESTS_READY = """Savollar tayyor!"""
 TESTS_READY_ERROR = """So'ralgan savollar soni mavjud savollardan ko'p"""
+TEST_INCORRECT = """Javobingiz xato!"""
+TEST_CORRECT = """Javobingiz to'g'ri!"""
+TEST_NOT_SELECTED = """Javob belgilanmagan!"""
+TEST_FILE_SELECT = """Test faylingizni tanlang:"""
 
 TESTS_ALREADY_ENDED = \
 """Test uchun ajratilgan vaqt tugadi!!!
@@ -121,8 +125,11 @@ def create_test_result(datas):
     res = f"<blockquote>Testni yakunladi!</blockquote>\n\n"
     res += f"     O'quvchi: {datas['student_fullname']}\n"
     res += f"     Fan: {datas['test_subjectname']}\n"
+    res += f"     Test: {datas['test_name']}\n"
     res += f"     Natija: {datas['test_result']}\n"
-    res += f"     Vaqt: {datas['test_ended_time']}\n"
+    res += f"     Yuborilgan: {datas['test_sended_time']}\n"
+    res += f"     Tugatilgan: {datas['test_ended_time']}\n"
+    res += "#natija"
     
     return res
     
@@ -152,6 +159,8 @@ SUBJECTS_SELECT = """Fanni tanlang:"""
 # OTHERS
 BACK = """Orqaga"""
 CONFIRM = """Tasdiqlash"""
+CONFIRMED = """✅Tasdiqlangan natijalar:"""
+NOT_CONFIRMED = """Tasdiqlanmagan natijalar:"""
 CANCEL = """Bekor qilish"""
 PAID = """To'landi ✅"""
 UNPAID = """To'lanmagan ❌"""
@@ -175,7 +184,9 @@ SOMETHING = """yana nimadir"""
 
 NEXT_PAGE = """Keyingi"""
 PREV_PAGE = """Oldingi"""
+RANDOM = """Aralash"""
 
+NO_STATS = """📊 Sizda statistik ma'lumotlar mavjud emas!"""
 NO_GROUPS = """Bu fan uchun guruhlar hali yaratilmagan!"""
 GROUPS = """Guruhlar"""
 REASON = """Rad etish sababi: """

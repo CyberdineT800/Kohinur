@@ -10,6 +10,7 @@ class TeacherStates(StatesGroup):
     teacher_tests_selected = State()
     teacher_group_selected = State()
     teacher_test_subject_selecting = State()
+    teacher_test_file_selecting = State()
     teacher_test_count_selecting = State()
     teacher_test_waiting_start = State()
     reason_non_acceptance = State()

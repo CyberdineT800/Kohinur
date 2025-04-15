@@ -21,7 +21,8 @@ from utils.helpers import create_all_groups_info, create_group_info, create_paym
 router = Router()
 
 
-@router.message(F.photo, IsBotAdminFilter(ADMINS))
+#@router.message(F.photo, IsBotAdminFilter(ADMINS))
+@router.message(F.photo)
 async def back_selecting(message: types.Message, state: FSMContext):
     file_id = message.photo[-1].file_id
     await message.reply(text=f"<code>{file_id}</code>")

@@ -5,7 +5,7 @@ import openpyxl
 
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, reply_keyboard_markup
 
-from data.text_values import NEW_GROUP_CREATED, TESTS_READY_ERROR
+from data.text_values import CONFIRMED, NEW_GROUP_CREATED, NO_STATS, NOT_CONFIRMED, TESTS_READY_ERROR
 
 
 def open_json_file(f_name):
@@ -76,7 +76,7 @@ async def create_questions(bot, chat_id, questions, count):
                 reply_markup=answer_btns
             )
 
-        msg_ids[message.message_id] = question
+        msg_ids[question['id']] = message.message_id
         j += 1
 
     return msg_ids
@@ -168,6 +168,49 @@ async def create_all_groups_info(groups, student_counts, page=0, items_per_page=
     return res
 
 
+async def create_student_statistics(statistics):
+    if not statistics:
+        return NO_STATS
+
+    grouped = {True: [], False: []}
+    for stat in statistics:
+        grouped[stat['confirm']].append(stat)
+
+    result = ""
+    for confirm_status, group in grouped.items():
+        if not group:
+            continue
+        section_title = f"<b>{CONFIRMED}</b>" if not confirm_status else f"⌛ <b>{NOT_CONFIRMED}</b>"
+        result += f"{section_title}\n\n"
+
+        for i, stat in enumerate(group, start=1):
+            correct = stat['total_correct']
+            total = stat['total_tests']
+            percent = round((correct / total) * 100, 1) if total else 0
+
+            result += (
+                f"{i}) <b>{stat['subjectname']}</b>\n"
+                f"   - To‘g‘ri javoblar: <b>{correct}</b>\n"
+                f"   - Umumiy testlar: <b>{total}</b>\n"
+                f"   - Foiz: <b>{percent}%</b>\n\n"
+            )
+
+    return result
+
+
+async def create_all_test_files_info(test_files, page=0, items_per_page=10):
+    res = ""
+    n = len(test_files)
+    start = page * items_per_page
+    end = start + items_per_page
+    
+    for i in range(start, min(end, n)):
+        res += f"{i + 1}) {test_files[i]['test_file_name']}"
+        res += '\n'
+        
+    return res
+
+
 async def create_payment_info(datas):
     res = "<blockquote>To'lov haqida ma'lumot</blockquote>\n\n"
     res += f"  O'quvchi: {datas['student_fullname']}\n"
@@ -193,7 +236,7 @@ async def create_attendance_info(datas):
 
 
 
-async def process_excel_file(tests_table, file_path, subject_id):
+async def process_excel_file(tests_table, file_path, test_file_id, subject_id):
      try:
         wb = openpyxl.load_workbook(file_path)
         ws = wb.active
@@ -205,17 +248,18 @@ async def process_excel_file(tests_table, file_path, subject_id):
                 break
             question_photo_id = row[1] if row[1] else None
             answers = [ans for ans in row[2:6] if ans]
-            correct_answer_index = int(row[6])
+            correct_answer_index = int(row[6]) - 1
 
             data = {
                 'subjectid': subject_id,
                 'questiontxt': question_text,
                 'questionphotoid': question_photo_id,
                 'answers': json.dumps(answers),  
+                'testfileid': test_file_id,
                 'correctanswerindex': correct_answer_index
             }
 
-            test = await tests_table.add_test(data)
+            await tests_table.add_test(data)
             count += 1
 
         return (True, count)

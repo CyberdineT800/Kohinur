@@ -9,6 +9,7 @@ class Tests(Database):
             QuestionTxt TEXT,
             QuestionPhotoId TEXT,
             Answers JSONB,
+            TestFileId INT,
             CorrectAnswerIndex INT
         );
         """
@@ -28,7 +29,8 @@ class Tests(Database):
             QuestionTxt = $3, 
             QuestionPhotoId = $4,
             Answers = $5,
-            CorrectAnswerIndex = $6
+            TestFileId = $6,
+            CorrectAnswerIndex = $7
         WHERE Id = $1
         RETURNING *
         """
@@ -38,6 +40,7 @@ class Tests(Database):
                                   data['questiontxt'],
                                   data['questionphotoid'],
                                   data['answers'],
+                                  data['testfileid'],
                                   data['correctanswerindex'],
                                   fetchrow=True)
 
@@ -48,7 +51,7 @@ class Tests(Database):
     async def select_test(self, **kwargs):
         sql = "SELECT * FROM Tests WHERE 1=1 AND "
         sql, parameters = self.format_args(sql, parameters=kwargs)
-        return await self.execute(sql, *parameters, fetchrow=True)
+        return await self.execute(sql, *parameters, fetch=True)
 
     def format_args(self, sql, parameters):
         sql_parts = []
@@ -61,6 +64,10 @@ class Tests(Database):
 
     async def select_tests_by_subjectid(self, subject_id):
         sql = "SELECT * FROM Tests WHERE SubjectId = $1"
+        return await self.execute(sql, subject_id, fetch=True)
+
+    async def select_tests_by_testfileid(self, subject_id):
+        sql = "SELECT * FROM Tests WHERE TestFileId = $1"
         return await self.execute(sql, subject_id, fetch=True)
 
     async def count_tests(self):

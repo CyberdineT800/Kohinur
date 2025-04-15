@@ -8,7 +8,7 @@ from aiogram.client.session.middlewares.request_logging import logger
 
 from data import config
 
-from loader import dispatcher, db, statistics, students, tests, attendance, payments, subjects, teachers, groups, bot
+from loader import dispatcher, db, statistics, students, tests, test_files, attendance, payments, subjects, teachers, groups, bot
 
 #logging.basicConfig(level=logging.INFO)
 #logging.basicConfig(level=logging.WARNING)
@@ -61,6 +61,10 @@ async def database_connected():
     await tests.create_table()
     print("Connected Tests table ...")
 
+    test_files.pool = db.pool
+    await test_files.create_table()
+    print("Connected Test Files table ...")
+
     attendance.pool = db.pool
     await attendance.create_table()
     print("Connected Attendance table ...")
@@ -109,16 +113,19 @@ async def aiogram_on_shutdown_polling(dispatcher: Dispatcher, bot: Bot):
 def main():
     """CONFIG"""
 
-    dispatcher.startup.register(aiogram_on_startup_polling)
-    dispatcher.shutdown.register(aiogram_on_shutdown_polling)
+    while True:
+        dispatcher.startup.register(aiogram_on_startup_polling)
+        dispatcher.shutdown.register(aiogram_on_shutdown_polling)
     
-    try:
-        asyncio.run(dispatcher.start_polling(bot, close_bot_session=True, allowed_updates=['message', 'chat_member', 'callback_query']))
-        print("Hammasi joyida !\n")
-    except Exception as e:
-        logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
-    finally:
-        asyncio.run(aiogram_on_shutdown_polling(dispatcher, bot))
+        try:
+            #asyncio.run(dispatcher.start_polling(bot, close_bot_session=True, allowed_updates=['message', 'chat_member', 'callback_query']))
+            asyncio.run(dispatcher.start_polling(bot, close_bot_session=False, allowed_updates=['message', 'chat_member', 'callback_query']))
+            print("Hammasi joyida !\n")
+        except Exception as e:
+            logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
+        finally:
+            asyncio.run(aiogram_on_shutdown_polling(dispatcher, bot))
+            print("\n\n=== Qayta ishga tushirilmoqda ===\n\n")
        
 
 

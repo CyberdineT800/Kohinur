@@ -60,12 +60,17 @@ async def selecting_test_count(callback: types.CallbackQuery, state: FSMContext)
     action = callback.data.replace('test_count_', '').strip()
     count = int(callback.message.text.replace(TEST_COUNT, ''))
     
+    datas = await state.get_data()
+
     if action == 'add':
-        count = count + 5
-        await bot.edit_message_text(text=TEST_COUNT+str(count), \
-                                    chat_id=callback.message.chat.id, \
-                                    message_id=callback.message.message_id, \
-                                    reply_markup=test_count_btns)
+        if count + 5 <= datas['available_tests_count']:
+            count = count + 5
+            await bot.edit_message_text(text=TEST_COUNT+str(count), \
+                                        chat_id=callback.message.chat.id, \
+                                        message_id=callback.message.message_id, \
+                                        reply_markup=test_count_btns)
+        else:
+            await callback.answer(TEST_COUNT_ERROR, show_alert=True)
     elif action == 'remove':
         if count > 5:
             count = count - 5
@@ -77,7 +82,6 @@ async def selecting_test_count(callback: types.CallbackQuery, state: FSMContext)
             await callback.answer(TEST_COUNT_ERROR, show_alert=True)
     elif action == 'confirm':
         try:
-            datas = await state.get_data()
             subject_id = datas['subject_id']
             available_test_count = datas['available_tests_count']
             
@@ -103,11 +107,11 @@ async def selecting_test_count(callback: types.CallbackQuery, state: FSMContext)
             logging.exception(f"Error sending questions: {err}")
             
 
-
 @router.callback_query(TestStates.test_sended, F.data.startswith('answer_'))
 async def do_answering(callback: types.CallbackQuery, state: FSMContext):
     now = datetime.now()
     datas = await state.get_data()
+    print("Guest", callback.data)
     
     start_time = datas['test_start_time']
     count = datas['count']
@@ -120,6 +124,8 @@ async def do_answering(callback: types.CallbackQuery, state: FSMContext):
     
         if answered == -1:
             test = await tests.select_test(id=test_id)
+            test = test[0]
+
             answer_id = int(data[2])
 
             if test['questionphotoid']:
@@ -131,15 +137,10 @@ async def do_answering(callback: types.CallbackQuery, state: FSMContext):
                                             message_id=callback.message.message_id, \
                                             text=callback.message.text + '\n\n' + f'<blockquote>{chr(answer_id + 65)}</blockquote>')
             
-            if test['correctanswerindex'] == answer_id:
-                await state.update_data({f'test_result_{test_id}': 1})
-            else:
-            
-                await state.update_data({f'test_result_{test_id}': 0})
+            await state.update_data({f'test_result_{test_id}': answer_id})
     else:
         await callback.answer(TESTS_ALREADY_ENDED, show_alert=True)
         
-
 
 @router.message(TestStates.test_sended, F.text == TEST_END_REQUEST)
 async def test_ending(message: types.Message, state: FSMContext):
@@ -148,18 +149,43 @@ async def test_ending(message: types.Message, state: FSMContext):
         keys = datas.keys()
 
         result = 0
-        all_tests = datas['count']
+        all_tests_count = datas['count']
+        ques_msg_ids = datas['ques_msgs']
 
-        for key in keys:
-            if key.startswith('test_result_'):
-                if datas[key] != -1:
+        try:
+            j = 1
+            for test_id, msg_id in ques_msg_ids.items():
+                test = await tests.select_test(id=test_id)
+                test = test[0]
+                key = f'test_result_{test_id}'
+                answer_id = datas.get(key, -1)
+
+                if answer_id == test['correctanswerindex']:
                     result += datas[key]
+                    adding = TEST_CORRECT
+                elif answer_id < 0:
+                    adding = TEST_NOT_SELECTED
+                else:
+                    adding = TEST_INCORRECT
+
+                if test['questionphotoid']:
+                    await bot.edit_message_caption(chat_id=message.chat.id,
+                                                   message_id=msg_id,
+                                                   caption=f"{j}) {test['questiontxt']} \n\n<blockquote> {adding} </blockquote> {chr(answer_id + 65)}")
+                else:
+                    await bot.edit_message_text(chat_id=message.chat.id,
+                                                message_id=msg_id,
+                                                text=f"{j}) {test['questiontxt']} \n\n<blockquote> {adding} </blockquote> {chr(answer_id + 65)}")  
+                j += 1    
+                    
+        except Exception as e:
+            logging.exception(f"Error in test_editing: {e}")
 
         subject_id = datas['subject_id']
         subject = await subjects.select_subject(id=subject_id)
 
         await message.answer(TEST_END)
-        await message.answer(f"<blockquote>{subject['subjectname']}</blockquote>\n{TEST_RESULT}{result}/{all_tests}", reply_markup=start_menu_btns)
+        await message.answer(f"<blockquote>{subject['subjectname']}</blockquote>\n{TEST_RESULT}{result}/{all_tests_count}", reply_markup=start_menu_btns)
 
         await state.clear()
         await state.set_state(StartStates.waiting_for_selecting)

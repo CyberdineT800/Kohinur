@@ -1,7 +1,7 @@
 from datetime import datetime, date, timedelta
 from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton
 
-from data.text_values import CANCEL, NEXT_PAGE, NO_TEXT, PREV_PAGE, SOMETHING, SPLITTER, STUDENT_ATTENDANCE_EXIST_STATUS, STUDENT_GROUPS, TEACHER_GROUPS, TEACHER_SUBJECTS, TEACHER_TESTS, CONFIRM, PAID, UNPAID, YES_TEXT
+from data.text_values import CANCEL, NEXT_PAGE, NO_TEXT, PREV_PAGE, RANDOM, SOMETHING, SPLITTER, STUDENT_ATTENDANCE_EXIST_STATUS, STUDENT_GROUPS, STUDENT_RESULTS, TEACHER_GROUPS, TEACHER_SUBJECTS, TEACHER_TESTS, CONFIRM, PAID, UNPAID, YES_TEXT
 
 
 def subject_btns(subjects):
@@ -31,11 +31,11 @@ def create_accepting_btns (call_data):
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 
 
-def create_test_accepting_btns (student_id, teacher_chat_id, stat_id):
+def create_test_accepting_btns (student_id, teacher_chat_id, stat_id, test_file_id):
     inline_keyboard = [
         [
-            InlineKeyboardButton(text=YES_TEXT, callback_data=f'test_confirm_{student_id}_{teacher_chat_id}_{stat_id}'),
-            InlineKeyboardButton(text=NO_TEXT, callback_data=f'test_not_confirm_{student_id}_{teacher_chat_id}_{stat_id}'),
+            InlineKeyboardButton(text=YES_TEXT, callback_data=f'test_confirm_{student_id}_{teacher_chat_id}_{stat_id}_{test_file_id}'),
+            InlineKeyboardButton(text=NO_TEXT, callback_data=f'test_confirm_not_{student_id}_{teacher_chat_id}_{stat_id}_{test_file_id}'),
         ],
     ]
     
@@ -59,7 +59,7 @@ def create_student_menu_btns (student_id):
     inline_keyboard = [
         [
             InlineKeyboardButton(text=STUDENT_GROUPS, callback_data=f'select_student_groups_{student_id}'),
-            InlineKeyboardButton(text=SOMETHING, callback_data=f'select_student_groups_{student_id}'),
+            InlineKeyboardButton(text=STUDENT_RESULTS, callback_data=f'select_student_results_{student_id}'),
         ],
     ]
     
@@ -87,6 +87,32 @@ def create_select_group_btns(groups, page=0, items_per_page=5):
     
     if nav_row:
         inline_keyboard.append(nav_row)
+    
+    return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
+
+
+def create_select_test_file_btns(test_files, page=0, items_per_page=10):
+    inline_keyboard = []
+    n = len(test_files)
+    start = page * items_per_page
+    end = start + items_per_page
+
+    row = []
+    for i in range(start, min(end, n)):
+        row.append(InlineKeyboardButton(text=f"{i + 1}", callback_data=f"teacher_select_test_file_{test_files[i]['test_file_id']}"))
+    
+    inline_keyboard.append(row)
+
+    nav_row = []
+    if page > 0:
+        nav_row.append(InlineKeyboardButton(text=PREV_PAGE, callback_data=f"test_file_page_{page - 1}"))
+    if end < n:
+        nav_row.append(InlineKeyboardButton(text=NEXT_PAGE, callback_data=f"test_file_page_{page + 1}"))
+
+    if nav_row:
+        inline_keyboard.append(nav_row)
+
+    inline_keyboard.append([InlineKeyboardButton(text=RANDOM, callback_data=f"test_file_page_random")])
     
     return InlineKeyboardMarkup(inline_keyboard=inline_keyboard)
 

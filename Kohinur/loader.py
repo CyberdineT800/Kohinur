@@ -6,6 +6,7 @@ from data.config import BOT_TOKEN
 
 from utils.db.postgres import Database
 from utils.db.tests import Tests
+from utils.db.test_files import TestFiles
 from utils.db.students import Students
 from utils.db.payments import Payments
 from utils.db.attendance import Attendance
@@ -21,6 +22,7 @@ ADMINS = open_json_file('data\\admins.json')
 db = Database()
 students = Students()
 tests = Tests()
+test_files = TestFiles()
 attendance = Attendance()
 payments = Payments()
 subjects = Subjects()

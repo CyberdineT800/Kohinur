@@ -70,6 +70,16 @@ class Groups(Database):
         sql, parameters = self.format_args(sql, parameters=kwargs)
         return await self.execute(sql, *parameters, fetchrow=True)
 
+    async def select_group_with_teacher_kwargs(self, **kwargs):
+        kwargs = {key: value for key, value in kwargs.items()}
+        sql = """SELECT g.*, t.Teacher_FullName AS group_teacher_fullname 
+                    FROM Groups g 
+                        JOIN Teachers t ON g.group_teacher_Id = t.teacher_Id
+                    ORDER BY g.group_id ASC
+                 WHERE 1=1 AND """
+        sql, parameters = self.format_args(sql, parameters=kwargs)
+        return await self.execute(sql, *parameters, fetchrow=True)
+
     def format_args(self, sql, parameters):
         sql_parts = []
         args = []
@@ -107,7 +117,7 @@ class Groups(Database):
                 return updated_group
         
         new_group = await self.add_group(data)
-        return new_group
+        return new_group 
 
 
     async def select_groups_by_subject(self, subject_id):
