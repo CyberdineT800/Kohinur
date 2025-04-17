@@ -136,10 +136,10 @@ if __name__ == "__main__":
     #     logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
 
     
-    #while True:
-    try:
-        main()
-    except Exception as e:
-        logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
-        
-    print("Qayta ishga tushirilmoqda ... ")
+    while True:
+        try:
+            main()
+        except Exception as e:
+            logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
+            
+        print("Qayta ishga tushirilmoqda ... ")

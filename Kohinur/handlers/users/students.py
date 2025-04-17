@@ -416,7 +416,7 @@ async def test_ending(message: types.Message, state: FSMContext):
                 answer_id = datas.get(key, -1)
 
                 if answer_id == test['correctanswerindex']:
-                    result += datas[key]
+                    result += 1
                     adding = TEST_CORRECT
                 elif answer_id < 0:
                     adding = TEST_NOT_SELECTED
