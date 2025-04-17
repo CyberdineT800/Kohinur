@@ -100,12 +100,12 @@ async def selecting_role(message: types.Message, state: FSMContext):
         await message.answer(STUDENT_SELECT)
         #await message.answer(STUDENT_FULLNAME, reply_markup=create_btn_with_back(message.from_user.full_name+TELEGRAM_NAME_SUFFIX))
         await message.answer(STUDENT_FULLNAME, reply_markup=back_btn)
-        await state.set_state(StudentStates.fullname);
+        await state.set_state(StudentStates.fullname)
     elif role==TEACHER:
         await message.answer(TEACHER_SELECT)
         #await message.answer(TEACHER_FULLNAME, reply_markup=create_btn_with_back(message.from_user.full_name+TELEGRAM_NAME_SUFFIX))
         await message.answer(TEACHER_FULLNAME, reply_markup=back_btn)
-        await state.set_state(TeacherStates.fullname);
+        await state.set_state(TeacherStates.fullname)
     elif role==TESTS:
         all_subjects = await subjects.select_all_subjects()
 

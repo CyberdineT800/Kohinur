@@ -113,35 +113,33 @@ async def aiogram_on_shutdown_polling(dispatcher: Dispatcher, bot: Bot):
 def main():
     """CONFIG"""
 
-    while True:
-        dispatcher.startup.register(aiogram_on_startup_polling)
-        dispatcher.shutdown.register(aiogram_on_shutdown_polling)
-    
-        try:
-            #asyncio.run(dispatcher.start_polling(bot, close_bot_session=True, allowed_updates=['message', 'chat_member', 'callback_query']))
-            asyncio.run(dispatcher.start_polling(bot, close_bot_session=False, allowed_updates=['message', 'chat_member', 'callback_query']))
-            print("Hammasi joyida !\n")
-        except Exception as e:
-            logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
-        finally:
-            asyncio.run(aiogram_on_shutdown_polling(dispatcher, bot))
-            print("\n\n=== Qayta ishga tushirilmoqda ===\n\n")
+    dispatcher.startup.register(aiogram_on_startup_polling)
+    dispatcher.shutdown.register(aiogram_on_shutdown_polling)
+
+    try:
+        #asyncio.run(dispatcher.start_polling(bot, close_bot_session=True, allowed_updates=['message', 'chat_member', 'callback_query']))
+        asyncio.run(dispatcher.start_polling(bot, close_bot_session=False, allowed_updates=['message', 'chat_member', 'callback_query']))
+        print("Hammasi joyida !\n")
+    except Exception as e:
+        logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
+    finally:
+        asyncio.run(aiogram_on_shutdown_polling(dispatcher, bot))
        
 
 
 if __name__ == "__main__":
     print("\n\nBot ishga tushdi !\n")
     
+    # try:
+    #     main()
+    # except Exception as e:
+    #     logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
+
+    
+    #while True:
     try:
         main()
     except Exception as e:
         logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
-
-    
-    # while True:
-    #     try:
-    #         main()
-    #     except Exception as e:
-    #         logger.error(f"\n\nBot stopped due to an exception: {e}\n\n")
-            
-    #     print("Qayta ishga tushirilmoqda ... ")
+        
+    print("Qayta ishga tushirilmoqda ... ")

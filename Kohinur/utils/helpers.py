@@ -1,9 +1,6 @@
 import json
 import logging
 import random
-import openpyxl
-
-from aiogram.types import InlineKeyboardMarkup, InlineKeyboardButton, reply_keyboard_markup
 
 from data.text_values import CONFIRMED, NEW_GROUP_CREATED, NO_STATS, NOT_CONFIRMED, TESTS_READY_ERROR
 

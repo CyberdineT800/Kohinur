@@ -14,10 +14,17 @@ from utils.db.teachers import Teachers
 from utils.db.subjects import Subjects
 from utils.db.groups import Groups
 from utils.db.statistics import Statistics
+from aiogram.client.default import DefaultBotProperties
 
 from utils.helpers import open_json_file
 
-ADMINS = open_json_file('data\\admins.json')
+# import os
+# main_dir = os.getcwd()+"/Kohinur/Kohinur"
+# tests_dir = os.path.join(main_dir, "data")
+# os.makedirs(tests_dir, exist_ok=True)
+# destination = os.path.join(main_dir, "data", "admins.json")
+
+ADMINS = open_json_file("data/admins.json")
 
 db = Database()
 students = Students()
@@ -33,4 +40,4 @@ statistics = Statistics()
 storage = MemoryStorage()
 dispatcher = Dispatcher(storage=storage)
 
-bot = Bot(token=BOT_TOKEN, parse_mode=ParseMode.HTML)
+bot = Bot(token=BOT_TOKEN, default=DefaultBotProperties(parse_mode=ParseMode.HTML))
